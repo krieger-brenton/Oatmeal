@@ -8,7 +8,7 @@ package Oatmeal;
 import java.awt.AWTException;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Graphics2D;
+import java.awt.Graphics;
 import java.awt.Rectangle;
 import java.awt.Robot;
 import java.awt.Toolkit;
@@ -16,11 +16,16 @@ import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorConvertOp;
 import java.awt.image.ColorModel;
-import java.awt.image.ImageObserver;
+import java.awt.image.ConvolveOp;
+import java.awt.image.Kernel;
 import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import javafx.util.Pair;
 import javax.imageio.ImageIO;
+//import Oatmeal.Doodad;
 
 /**
  *
@@ -30,17 +35,18 @@ public class ImageControls {
 
     public ImageControls() {
         screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        this.width = screenSize.getWidth();
-        this.height = screenSize.getHeight();
+        this.screenWidth = screenSize.getWidth();
+        this.screenHeight = screenSize.getHeight();
     }
 
-    private final Dimension screenSize;
-    private final double width;
-    private final double height;
+    final Dimension screenSize;
+    final double screenWidth;
+    final double screenHeight;
 
     private final int RED = 16711680;
     private final int YELLOW = 16776960;
     private final int BLACK = -16777216;
+    private final int GREEN = -15887616;
     private final int WHITE = -1;
     private final int SKY = -7171841;
     private final int CLOUD = -10178305;
@@ -52,6 +58,17 @@ public class ImageControls {
         BufferedImage bufferedImage;
         bufferedImage = new Robot().createScreenCapture(r);
         return bufferedImage;
+    }
+
+    /*
+    http://stackoverflow.com/questions/2386064/how-do-i-crop-an-image-in-java
+     */
+    public BufferedImage cropScreenShot(BufferedImage bi, int startX, int startY, int endX, int endY) {
+        BufferedImage img = bi.getSubimage(startX, startY, endX, endY);
+        BufferedImage copyOfImage = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics g = copyOfImage.createGraphics();
+        g.drawImage(img, 0, 0, null);
+        return copyOfImage;
     }
 
     public void saveScreenShot(String name, BufferedImage image) {
@@ -121,9 +138,10 @@ public class ImageControls {
     }
 
     public void filterBackground(BufferedImage bi) {
-
-        for (int i = 0; i < width; i++) {
-            for (int j = 0; j < height; j++) {
+        int x = bi.getWidth();
+        int y = bi.getHeight();
+        for (int i = 0; i < x; i++) {
+            for (int j = 0; j < y; j++) {
                 int currentPixel = bi.getRGB(i, j);
                 switch (currentPixel) {
                     case SKY:
@@ -136,6 +154,9 @@ public class ImageControls {
                 }
             }
         }
+    }
+
+    public void grayscale(BufferedImage bi) {
         ColorConvertOp op = new ColorConvertOp(ColorSpace.getInstance(ColorSpace.CS_GRAY), null);
         op.filter(bi, bi);
     }
@@ -151,29 +172,187 @@ public class ImageControls {
         return null;
     }
 
-    public void edgeDetection(BufferedImage bi) {
+    public List derive(BufferedImage bi) {
+        List derive = new ArrayList();
+        int x = bi.getWidth() - 50;
+        int y = bi.getHeight() - 50;
+        int delta = 3000000;
 
-        BufferedImage save = new BufferedImage((int) width, (int) height, BufferedImage.TYPE_INT_RGB);
-        int delta = 100000;
-        double x = width - 1;
-        double y = height - 1;
-
-        for (int i = 0; i < x; i++) {
-            for (int j = 0; j < y; j++) {
+        for (int i = 50; i < x; i++) {
+            for (int j = 50; j < y; j++) {
                 int currentPixel = bi.getRGB(i, j);
                 int nextPixel = bi.getRGB((i + 1), j);
                 int lowerPixel = bi.getRGB(i, (j + 1));
                 int rightDifference = Math.abs(currentPixel - nextPixel);
                 int bottomDifference = Math.abs(currentPixel - lowerPixel);
                 if (rightDifference > delta) {
-                    save.setRGB(i, j, RED);
+                    derive.add(new Pair(i, j));
                 }
                 if (bottomDifference > delta) {
-                    save.setRGB(i, j, YELLOW);
+                    derive.add(new Pair(i, j));
                 }
             }
         }
-        saveScreenShot("edges0", save);
+        return derive;
+    }
+
+    public List<Pair>[][] sortPoints(List points, int height, int width, int delta) {
+        List<Pair>[][] pointGrid = (ArrayList<Pair>[][]) new ArrayList[Math.floorDiv(height, delta)][Math.floorDiv(width, delta)];
+//        System.out.println( Math.floorDiv((int) height, delta) + "+" + Math.floorDiv((int) width, delta));
+        for (Object point : points) {
+            Pair p = (Pair) point;
+//            System.out.println( Math.floorDiv((int) p.getKey(), delta) + "+" + Math.floorDiv((int) p.getValue(), delta));
+            if (pointGrid[Math.floorDiv((int) p.getValue(), delta)][Math.floorDiv((int) p.getKey(), delta)] == null) {
+                pointGrid[Math.floorDiv((int) p.getValue(), delta)][Math.floorDiv((int) p.getKey(), delta)] = new ArrayList();
+            }
+            pointGrid[Math.floorDiv((int) p.getValue(), delta)][Math.floorDiv((int) p.getKey(), delta)].add(p);
+        }
+        return pointGrid;
+    }
+
+    public List createDoodads(List<Pair>[][] pointGrid, int height, int length) {
+        List doodads = new ArrayList();
+        int xMax, xMin, yMax, yMin, xValue, yValue;
+
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < length; j++) {
+                xMax = 0;
+                xMin = Integer.MAX_VALUE;
+                yMax = 0;
+                yMin = Integer.MAX_VALUE;
+                if (pointGrid[i][j] != null) {
+                    for (Object pair : pointGrid[i][j]) {
+                        Pair p = (Pair) pair;
+                        xValue = (int) p.getKey();
+                        yValue = (int) p.getValue();
+                        xMax = Math.max(xMax, xValue);
+                        xMin = Math.min(xMin, xValue);
+                        yMax = Math.max(yMax, yValue);
+                        yMin = Math.min(yMin, yValue);
+                    }
+                }
+                if (xMax != 0 && xMin != Integer.MAX_VALUE && yMax != 0 && yMin != Integer.MAX_VALUE) {
+                    doodads.add(new Doodad(xMax, yMax, xMin, yMin));
+                }
+            }
+        }
+
+        return doodads;
+    }
+
+    public void drawDoodads(List doodads, String name) {
+        BufferedImage save = new BufferedImage((int) screenWidth, (int) screenHeight, BufferedImage.TYPE_INT_RGB);
+        for (Object doodad : doodads) {
+            Doodad d = (Doodad) doodad;
+
+            System.out.println("Xmax: " + d.getxMax() + " Xmin: " + d.getxMin() + " Ymax: " + d.getyMax() + " Ymin: " + d.getyMin());
+            for (int i = d.getxMin(); i < d.getxMax(); i++) {
+                save.setRGB(i, d.getyMax(), WHITE);
+                save.setRGB(i, d.getyMin(), WHITE);
+            }
+            for (int i = d.getyMin(); i < d.getyMax(); i++) {
+                save.setRGB(d.getxMax(), i, WHITE);
+                save.setRGB(d.getxMin(), i, WHITE);
+            }
+        }
+
+        saveScreenShot(name, save);
+    }
+
+    public void detectEdges(BufferedImage bi, String name) {
+        int height = bi.getHeight();
+        int width = bi.getWidth();
+        int delta = 70;
+        List points = derive(bi);
+        List doodads = createDoodads(sortPoints(points, height, width, delta), Math.floorDiv(height, delta), Math.floorDiv(width, delta));
+        drawDoodads(doodads, name);
+    }
+
+    public void edgeDetection(BufferedImage bi) {
+        int x = bi.getWidth() - 50;
+        int y = bi.getHeight() - 50;
+        int objectDelta = 50;
+        List Derive = new ArrayList();
+        List doodads = new ArrayList();
+        List<Pair>[] DeriveY = (ArrayList<Pair>[]) new ArrayList[Math.floorDiv(bi.getHeight(), objectDelta)];
+        BufferedImage save = new BufferedImage(x + 50, y + 50, BufferedImage.TYPE_INT_RGB);
+        BufferedImage save1 = new BufferedImage(x + 50, y + 50, BufferedImage.TYPE_INT_RGB);
+        int delta = 3000000;
+
+        for (int i = 50; i < x; i++) {
+            for (int j = 50; j < y; j++) {
+                int currentPixel = bi.getRGB(i, j);
+                int nextPixel = bi.getRGB((i + 1), j);
+                int lowerPixel = bi.getRGB(i, (j + 1));
+                int rightDifference = Math.abs(currentPixel - nextPixel);
+                int bottomDifference = Math.abs(currentPixel - lowerPixel);
+                if (rightDifference > delta) {
+                    save1.setRGB(i, j, RED);
+                    Derive.add(new Pair(i, j));
+                }
+                if (bottomDifference > delta) {
+                    save1.setRGB(i, j, YELLOW);
+                    Derive.add(new Pair(i, j));
+                }
+            }
+        }
+        int xMax = 0, xMin = Integer.MAX_VALUE, yMax = 0, yMin = Integer.MAX_VALUE;
+        int lastX = 0;
+        int lastY = 0;
+
+        for (Object pair : Derive) {
+            Pair p = (Pair) pair;
+            int xValue = (int) p.getKey();
+            int yValue = (int) p.getValue();
+
+            if (Math.abs(xValue - lastX) > objectDelta) {
+//                System.out.println("x");
+                doodads.add(new Doodad(xMax, yMax, xMin, yMin));
+                xMax = 0;
+                xMin = Integer.MAX_VALUE;
+                yMax = 0;
+                yMin = Integer.MAX_VALUE;
+            }
+            if (Math.abs(yValue - lastY) > objectDelta) {
+//                System.out.println("y");
+                int index = Math.floorDiv(yValue, objectDelta);
+                if (DeriveY[index] == null) {
+                    DeriveY[index] = new ArrayList();
+                }
+                DeriveY[index].add(p);
+                lastX = xValue;
+                lastY = yValue;
+                continue;
+            }
+            xMax = Math.max(xMax, xValue);
+            xMin = Math.min(xMin, xValue);
+            yMax = Math.max(yMax, yValue);
+            yMin = Math.min(yMin, yValue);
+
+            lastX = xValue;
+            lastY = yValue;
+        }
+        doodads.add(new Doodad(xMax, yMax, xMin, yMin));
+        doodads.remove(0);
+
+        for (Object dd : doodads) {
+            Doodad d = (Doodad) dd;
+            xMax = d.getxMax();
+            xMin = d.getxMin();
+            yMax = d.getyMax();
+            yMin = d.getyMin();
+            System.out.println("Xmax: " + xMax + " Xmin: " + xMin + " Ymax: " + yMax + " Ymin: " + yMin);
+            for (int i = xMin; i < xMax; i++) {
+                save.setRGB(i, yMax, WHITE);
+                save.setRGB(i, yMin, WHITE);
+            }
+            for (int i = yMin; i < yMax; i++) {
+                save.setRGB(xMax, i, WHITE);
+                save.setRGB(xMin, i, WHITE);
+            }
+        }
+//        saveScreenShot("edges0", save);
+        saveScreenShot("edges1", save1);
 
     }
 
@@ -182,5 +361,17 @@ public class ImageControls {
         boolean isAlphaPremultiplied = cm.isAlphaPremultiplied();
         WritableRaster raster = bi.copyData(bi.getRaster().createCompatibleWritableRaster());
         return new BufferedImage(cm, raster, isAlphaPremultiplied, null);
+    }
+
+    public BufferedImage blur(BufferedImage bi, int matrixSize) {
+        int kSquared = matrixSize * matrixSize;
+        float[] data = new float[kSquared];
+        for (int i = 0; i < kSquared; i++) {
+            data[i] = 1.0f / kSquared;
+        }
+        Kernel kernel = new Kernel(matrixSize, matrixSize, data);
+        ConvolveOp convolve = new ConvolveOp(kernel);
+        bi = convolve.filter(bi, null);
+        return bi;
     }
 }
