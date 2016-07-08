@@ -9,6 +9,8 @@ import Robot.GameControls;
 import java.awt.AWTException;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
+import java.util.List;
+import java.util.Set;
 
 /**
  *
@@ -17,20 +19,27 @@ import java.awt.image.BufferedImage;
 public class Execute {
 
     public static void main(String[] args) throws AWTException {
-        GameControls gc = new GameControls();
+        GameLogic gl = new GameLogic();
         ImageControls ic = new ImageControls();
         BufferedImage image;
+//        long start = 0, end = 0, total = 0;
+//        int iterations = 10;
+//        for (int i = 0; i < iterations; i++) {
+//            start = System.currentTimeMillis();
+        gl.start();
+        while (true) {
 
-        //image = ic.takeScreenShot();
-        image = ic.loadBufferedImage("C:/Users/Brenton/Desktop/CS499/screenShots/screenshot_full1.png");
-        image = ic.cropScreenShot(image, 0, 150, (int) ic.screenSize.getWidth(), (int) ic.screenSize.getHeight() - 238);
-        ic.filterBackground(image);
-        //image = ic.blur(image, 2);
-        //ic.saveScreenShot("blured0", image);
-//        ic.saveScreenShot("cropped0", image);
-        ic.grayscale(image);
-//        ic.saveScreenShot("grayscaled0", image);
-        //ic.edgeDetection(image);
-        ic.detectEdges(image, "test1");
+            image = ic.takeScreenShot();
+//        image = ic.loadBufferedImage("C:/Users/Brenton/Desktop/CS499/screenShots/screenshot_full11.png");
+            image = ic.cropScreenShot(image, 710, 150, image.getWidth() - 710, image.getHeight() - 240);
+//            ic.saveScreenShot("edgesA", image);
+            ic.filterBackground(image);
+            ic.grayscale(image);
+            List doodads = ic.detectEdges(image, "edgesB", 50);
+            gl.run(doodads);
+//            end = System.currentTimeMillis();
+//            total += end - start;
+        }
+//        System.out.println("Mean time with " + iterations + " iterations: " + (total / iterations) / 1000.f);
     }
 }
