@@ -22,7 +22,10 @@ import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javafx.util.Pair;
 import javax.imageio.ImageIO;
 //import Oatmeal.Doodad;
@@ -146,9 +149,9 @@ public class ImageControls {
                 switch (currentPixel) {
                     case SKY:
                     case CLOUD:
-                    case BLACK:
                     case HILL:
                     case BUSH:
+                    case BLACK:
                         bi.setRGB(i, j, WHITE);
                         break;
                 }
@@ -174,98 +177,124 @@ public class ImageControls {
 
     public List derive(BufferedImage bi) {
         List derive = new ArrayList();
-        int x = bi.getWidth() - 50;
-        int y = bi.getHeight() - 50;
+        int x = bi.getWidth() - 3;
+        int y = bi.getHeight() - 1;
         int delta = 3000000;
+        int inc = 1;
 
-        for (int i = 50; i < x; i++) {
-            for (int j = 50; j < y; j++) {
+        for (int i = 0; i < x; i += inc) {
+            for (int j = 0; j < y; j += inc) {
                 int currentPixel = bi.getRGB(i, j);
                 int nextPixel = bi.getRGB((i + 1), j);
                 int lowerPixel = bi.getRGB(i, (j + 1));
                 int rightDifference = Math.abs(currentPixel - nextPixel);
                 int bottomDifference = Math.abs(currentPixel - lowerPixel);
                 if (rightDifference > delta) {
-                    derive.add(new Pair(i, j));
+                    derive.add(new Couple(i, j));
                 }
                 if (bottomDifference > delta) {
-                    derive.add(new Pair(i, j));
+                    derive.add(new Couple(i, j));
                 }
             }
         }
         return derive;
     }
 
-    public List<Pair>[][] sortPoints(List points, int height, int width, int delta) {
-        List<Pair>[][] pointGrid = (ArrayList<Pair>[][]) new ArrayList[Math.floorDiv(height, delta)][Math.floorDiv(width, delta)];
-//        System.out.println( Math.floorDiv((int) height, delta) + "+" + Math.floorDiv((int) width, delta));
-        for (Object point : points) {
-            Pair p = (Pair) point;
-//            System.out.println( Math.floorDiv((int) p.getKey(), delta) + "+" + Math.floorDiv((int) p.getValue(), delta));
-            if (pointGrid[Math.floorDiv((int) p.getValue(), delta)][Math.floorDiv((int) p.getKey(), delta)] == null) {
-                pointGrid[Math.floorDiv((int) p.getValue(), delta)][Math.floorDiv((int) p.getKey(), delta)] = new ArrayList();
+    public List<List<Couple>> sortPoints(List points, int delta) {
+        List<List<Couple>> pointGrid = new ArrayList<>();
+        if (points.isEmpty()) {
+            return null;
+        }
+        pointGrid.add(new ArrayList() {
+            {
+                add(points.get(0));
             }
-            pointGrid[Math.floorDiv((int) p.getValue(), delta)][Math.floorDiv((int) p.getKey(), delta)].add(p);
+        });
+//        int lastX = 0;
+        for (Object couple : points) {
+            Couple c = (Couple) couple;
+            boolean placed = false;
+            int size = pointGrid.size();
+            
+            for (int i = 0; i < size; i++) {
+                if (!placed) {
+                    ArrayList al = (ArrayList) pointGrid.get(i);
+                    Couple c2 = (Couple) al.get(0);
+                    if (Math.abs(c2.x - c.x) < delta && Math.abs(c2.y - c.y) < delta) {
+                        al.add(c);
+                        placed = true;
+                    }
+                }
+            }
+
+            if (!placed) {
+                pointGrid.add(new ArrayList() {
+                    {
+                        add(c);
+                    }
+                });
+                placed = true;
+            }
+//            lastX = c.x;
         }
         return pointGrid;
     }
 
-    public List createDoodads(List<Pair>[][] pointGrid, int height, int length) {
-        List doodads = new ArrayList();
-        int xMax, xMin, yMax, yMin, xValue, yValue;
-
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < length; j++) {
-                xMax = 0;
-                xMin = Integer.MAX_VALUE;
-                yMax = 0;
-                yMin = Integer.MAX_VALUE;
-                if (pointGrid[i][j] != null) {
-                    for (Object pair : pointGrid[i][j]) {
-                        Pair p = (Pair) pair;
-                        xValue = (int) p.getKey();
-                        yValue = (int) p.getValue();
-                        xMax = Math.max(xMax, xValue);
-                        xMin = Math.min(xMin, xValue);
-                        yMax = Math.max(yMax, yValue);
-                        yMin = Math.min(yMin, yValue);
-                    }
-                }
-                if (xMax != 0 && xMin != Integer.MAX_VALUE && yMax != 0 && yMin != Integer.MAX_VALUE) {
-                    doodads.add(new Doodad(xMax, yMax, xMin, yMin));
-                }
-            }
+    public List createDoodads(List<List<Couple>> pointGrid) {
+        if (pointGrid == null) {
+            return null;
         }
+        List doodads = new ArrayList();
+        int xMax, xMin, yMax, yMin;
+        xMax = 0;
+        xMin = Integer.MAX_VALUE;
+        yMax = 0;
+        yMin = Integer.MAX_VALUE;
+        for (Object list : pointGrid) {
+            ArrayList al = (ArrayList) list;
 
+            for (Object couple : al) {
+                Couple c = (Couple) couple;
+                xMax = Math.max(xMax, c.x);
+                xMin = Math.min(xMin, c.x);
+                yMax = Math.max(yMax, c.y);
+                yMin = Math.min(yMin, c.y);
+            }
+            doodads.add(new Doodad(xMax, yMax, xMin, yMin));
+            xMax = 0;
+            xMin = Integer.MAX_VALUE;
+            yMax = 0;
+            yMin = Integer.MAX_VALUE;
+        }
         return doodads;
     }
 
-    public void drawDoodads(List doodads, String name) {
-        BufferedImage save = new BufferedImage((int) screenWidth, (int) screenHeight, BufferedImage.TYPE_INT_RGB);
+    public void drawDoodads(List doodads, String name, int height, int width) {
+        if (doodads == null) {
+            return;
+        }
+        BufferedImage save = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         for (Object doodad : doodads) {
             Doodad d = (Doodad) doodad;
-
-            System.out.println("Xmax: " + d.getxMax() + " Xmin: " + d.getxMin() + " Ymax: " + d.getyMax() + " Ymin: " + d.getyMin());
-            for (int i = d.getxMin(); i < d.getxMax(); i++) {
-                save.setRGB(i, d.getyMax(), WHITE);
-                save.setRGB(i, d.getyMin(), WHITE);
+            for (int i = d.xMin; i < d.xMax; i++) {
+                save.setRGB(i, d.yMax, WHITE);
+                save.setRGB(i, d.yMin, WHITE);
             }
-            for (int i = d.getyMin(); i < d.getyMax(); i++) {
-                save.setRGB(d.getxMax(), i, WHITE);
-                save.setRGB(d.getxMin(), i, WHITE);
+            for (int i = d.yMin; i < d.yMax; i++) {
+                save.setRGB(d.xMax, i, WHITE);
+                save.setRGB(d.xMin, i, WHITE);
             }
         }
-
         saveScreenShot(name, save);
     }
 
-    public void detectEdges(BufferedImage bi, String name) {
+    public List detectEdges(BufferedImage bi, String name, int delta) {
         int height = bi.getHeight();
         int width = bi.getWidth();
-        int delta = 70;
         List points = derive(bi);
-        List doodads = createDoodads(sortPoints(points, height, width, delta), Math.floorDiv(height, delta), Math.floorDiv(width, delta));
-        drawDoodads(doodads, name);
+        List doodads = createDoodads(sortPoints(points, delta));
+//        drawDoodads(doodads, name, height, width);
+        return doodads;
     }
 
     public void edgeDetection(BufferedImage bi) {
@@ -337,10 +366,10 @@ public class ImageControls {
 
         for (Object dd : doodads) {
             Doodad d = (Doodad) dd;
-            xMax = d.getxMax();
-            xMin = d.getxMin();
-            yMax = d.getyMax();
-            yMin = d.getyMin();
+            xMax = d.xMax;
+            xMin = d.xMin;
+            yMax = d.yMax;
+            yMin = d.yMin;
             System.out.println("Xmax: " + xMax + " Xmin: " + xMin + " Ymax: " + yMax + " Ymin: " + yMin);
             for (int i = xMin; i < xMax; i++) {
                 save.setRGB(i, yMax, WHITE);

@@ -5,6 +5,7 @@
  */
 package Oatmeal;
 
+import java.util.Objects;
 import javafx.util.Pair;
 
 /**
@@ -13,38 +14,50 @@ import javafx.util.Pair;
  */
 public class Doodad {
 
-    private int xMax;
-    private int yMax;
-    private int xMin;
-    private int yMin;
-    private Pair center;
+    public final int xMax;
+    public final int yMax;
+    public final int xMin;
+    public final int yMin;
+    public final Couple center;
 
     public Doodad(int xMax, int yMax, int xMin, int yMin) {
         this.xMax = xMax;
         this.yMax = yMax;
         this.xMin = xMin;
         this.yMin = yMin;
-        this.center = new Pair(Math.floor(xMax - xMin), Math.floor(yMax - yMin));
+        this.center = new Couple(xMax - ((xMax - xMin) / 2) , yMax - ((yMax - yMin) / 2));
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 59 * hash + this.xMax;
+        hash = 59 * hash + this.yMax;
+        hash = 59 * hash + this.xMin;
+        hash = 59 * hash + this.yMin;
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Doodad other = (Doodad) obj;
+        if (!Objects.equals(this.center, other.center)) {
+            return false;
+        }
+        return true;
+    }
+
     
     
-    public int getxMax() {
-        return xMax;
-    }
+    
 
-    public int getyMax() {
-        return yMax;
-    }
-
-    public int getxMin() {
-        return xMin;
-    }
-
-    public int getyMin() {
-        return yMin;
-    }
-
-    public Pair getCenter() {
-        return center;
-    }
 }
