@@ -22,13 +22,9 @@ import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import javafx.util.Pair;
 import javax.imageio.ImageIO;
-//import Oatmeal.Doodad;
 
 /**
  *
@@ -36,7 +32,11 @@ import javax.imageio.ImageIO;
  */
 public class ImageControls {
 
-    public ImageControls() {
+    Robot rob;
+    Rectangle r = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
+    
+    public ImageControls() throws AWTException {
+        this.rob = new Robot();
         screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         this.screenWidth = screenSize.getWidth();
         this.screenHeight = screenSize.getHeight();
@@ -53,14 +53,13 @@ public class ImageControls {
     private final int WHITE = -1;
     private final int SKY = -7171841;
     private final int CLOUD = -10178305;
-    private final int HILL = -15887616;
-    private final int BUSH = -7809024;
+    public static final int HILL = -15887616;
+    public static final int BUSH = -7809024;
+    public static final int BROWN = -6730240;
+    public static final int GOOMBABELLY = -13115;
 
     public BufferedImage takeScreenShot() throws AWTException {
-        Rectangle r = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
-        BufferedImage bufferedImage;
-        bufferedImage = new Robot().createScreenCapture(r);
-        return bufferedImage;
+        return rob.createScreenCapture(r);
     }
 
     /*
@@ -289,8 +288,8 @@ public class ImageControls {
     }
 
     public List detectEdges(BufferedImage bi, String name, int delta) {
-        int height = bi.getHeight();
-        int width = bi.getWidth();
+//        int height = bi.getHeight();
+//        int width = bi.getWidth();
         List points = derive(bi);
         List doodads = createDoodads(sortPoints(points, delta));
 //        drawDoodads(doodads, name, height, width);

@@ -31,8 +31,12 @@ public class GameControls {
     }
     
     public void tapKey(Button b, int time) {
+//        if (jumpPressed)
+//            robot.keyRelease(b.code());
+//        jumpPressed = true;
         robot.keyPress(b.code());
         robot.delay(time);
         robot.keyRelease(b.code());
+//        jumpPressed = false;
     }
 }

@@ -6,7 +6,6 @@
 package Oatmeal;
 
 import java.util.Objects;
-import javafx.util.Pair;
 
 /**
  *
